@@ -45,7 +45,7 @@ void append_code(Code *code, Op* op) {
 	if (op->offset_to_address > 0) {
 		if (code->size_addresses_to_update - code->count_addresses_to_update <= 0) {
 			size_t newsize = code->size_addresses_to_update + 64;
-			code->addresses_to_update = realloc(code->addresses_to_update, newsize * sizeof(void*));
+			code->addresses_to_update = realloc(code->addresses_to_update, newsize * sizeof(*code->addresses_to_update));
 			code->size_addresses_to_update = newsize;
 		}
 		code->addresses_to_update[code->count_addresses_to_update++] = code->count - op->code_size + op->offset_to_address;
