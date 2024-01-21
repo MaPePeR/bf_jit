@@ -219,9 +219,9 @@ int main(int argc, const char *argv[]) {
 	codes.jump_if_not_zero.offset_to_address = findAddressOffset(code_jump_if_not_zero, codes.jump_if_not_zero.code_size);
 
 	const char * filename = argv[1];
-	compiled_assembly *code = compile(filename, &codes);
+	compiled_assembly *compiled_code = compile(filename, &codes);
 	unsigned char *memory = calloc(30000, 1);
-	code(memory);
+	compiled_code(memory);
 	free(memory);
 	return 0;
 }
