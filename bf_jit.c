@@ -3,6 +3,13 @@
 #include<sys/mman.h>
 #include<string.h>
 
+#ifndef BF_JIT_MEM_SIZE
+#define BF_JIT_MEM_SIZE (1<<15)
+#endif 
+
+#define XSTR(S) STR(S)
+#define STR(S) #S
+
 typedef struct {
 	void *code;
 	size_t code_size;
@@ -89,7 +96,7 @@ void compile_ops(Code *code, FILE *file, OpCodes *codes, int end) {
 	}
 }
 
-typedef void *compiled_assembly(unsigned char *);
+typedef void *compiled_assembly(unsigned char *, unsigned char *);
 
 compiled_assembly *compile(const char *filename, OpCodes* codes) {
 	Code code = {0};
@@ -149,12 +156,22 @@ extern void code_jump_if_zero();
 extern void code_jump_if_not_zero();
 extern void code_exit();
 
+/*
+rdi - head pointer
+rsi - memory begin
+*/
 asm("\n"
 "code_left: \n"
 "	subq $1, %rdi\n"
+"	subq %rsi, %rdi\n"
+"	and $" XSTR((BF_JIT_MEM_SIZE-1)) ", %rdi\n"
+"	addq %rsi, %rdi\n"
 "	ret\n"
 "code_right: \n"
 "	addq $1, %rdi\n"
+"	subq %rsi, %rdi\n"
+"	and $" XSTR((BF_JIT_MEM_SIZE-1)) ", %rdi\n"
+"	addq %rsi, %rdi\n"
 "	ret\n"
 "code_inc: \n"
 "	addb $1, (%rdi)\n"
@@ -164,20 +181,24 @@ asm("\n"
 "	ret\n"
 "code_output: \n"
 "	push %rdi\n"
+"	push %rsi\n"
 "	mov $1, %rax\n"
 "	mov %rdi, %rsi\n"
 "	mov $1, %rdi\n"
 "	mov $1, %rdx\n"
 "	syscall\n"
+"	pop %rsi\n"
 "	pop %rdi\n"
 "	ret\n"
 "code_input: \n"
 "	push %rdi\n"
+"	push %rsi\n"
 "	mov $0, %rax\n"
 "	mov %rdi, %rsi\n"
 "	mov $0, %rdi\n"
 "	mov $1, %rdx\n"
 "	syscall\n"
+"	pop %rsi\n"
 "	pop %rdi\n"
 "	ret\n"
 "code_jump_if_zero: \n"
@@ -220,8 +241,8 @@ int main(int argc, const char *argv[]) {
 
 	const char * filename = argv[1];
 	compiled_assembly *compiled_code = compile(filename, &codes);
-	unsigned char *memory = calloc(30000, 1);
-	compiled_code(memory);
+	unsigned char *memory = calloc(BF_JIT_MEM_SIZE, 1);
+	compiled_code(memory, memory);
 	free(memory);
 	return 0;
 }
