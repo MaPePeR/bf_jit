@@ -17,6 +17,8 @@ typedef struct {
 } Op;
 
 typedef struct {
+	void *prologe_begin;
+	size_t prologe_size;
 	Op left;
 	Op right;
 	Op inc;
@@ -109,13 +111,14 @@ compiled_assembly *compile(const char *filename, OpCodes* codes) {
 	append_code(&code, &codes->exit);
 	fclose(file);
 
-	void * assembly = mmap(NULL, code.count,  PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	memcpy(assembly, code.data, code.count);
+	void * assembly = mmap(NULL, code.count + codes->prologe_size,  PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	memcpy(assembly, codes->prologe_begin, codes->prologe_size);
+	memcpy(assembly + codes->prologe_size, code.data, code.count);
 	// Backpatch offset to memory region:
 	for (int i = 0; i < code.count_addresses_to_update; ++i) {
-		void **loc = (void**)(assembly + code.addresses_to_update[i]);
+		void **loc = (void**)(assembly + codes->prologe_size + code.addresses_to_update[i]);
 		size_t offset = (size_t)*(void**)loc;
-		*loc = (unsigned char*)assembly + offset;
+		*loc = (unsigned char*)assembly + offset + codes->prologe_size;
 	}
 	if (code.data) {
 		free(code.data);
@@ -146,6 +149,10 @@ int findAddressOffset(void *start, size_t len) {
 	return 0;
 }
 
+
+
+extern void *prologe_begin();
+extern void *prologe_end();
 extern void *code_right(void *head, void *memory_begin);
 extern void *code_left(void *head, void *memory_begin);
 extern void *code_inc(void *head, void *memory_begin);
@@ -162,6 +169,8 @@ rdi - head pointer
 rsi - memory begin
 */
 asm("\n"
+"prologe_begin:\n"
+"prologe_end:\n"
 "code_left: \n"
 "	subq $1, %rdi\n"
 "	subq %rsi, %rdi\n"
@@ -237,6 +246,8 @@ int main(int argc, const char *argv[]) {
 
 	size_t epiloge_size = (char*)epiloge_end - (char *)epiloge_begin;
 	OpCodes codes = {
+		prologe_begin,
+		prologe_end - prologe_begin,
 		{code_left, findLength(code_left, epiloge_begin, epiloge_size), 0},
 		{code_right, findLength(code_right, epiloge_begin, epiloge_size), 0},
 		{code_inc, findLength(code_inc, epiloge_begin, epiloge_size), 0},
