@@ -126,9 +126,9 @@ compiled_assembly *compile(const char *filename, OpCodes* codes) {
 	return assembly;
 }
 
-int findLength(void *start) {
+int findLength(void *start, void *epiloge_begin, size_t epiloge_size) {
 	unsigned char *p = start;
-	while (*p++ != 0xC3) {}// x86 Return
+	while (memcmp(p++, epiloge_begin, epiloge_size) != 0) {}// x86 Return
 	return p - 1 - (unsigned char*)start;
 }
 
@@ -154,7 +154,8 @@ extern void code_output();
 extern void code_input();
 extern void code_jump_if_zero();
 extern void code_jump_if_not_zero();
-extern void code_exit();
+extern void epiloge_begin();
+extern void epiloge_end();
 
 /*
 rdi - head pointer
@@ -166,18 +167,22 @@ asm("\n"
 "	subq %rsi, %rdi\n"
 "	and $" XSTR((BF_JIT_MEM_SIZE-1)) ", %rdi\n"
 "	addq %rsi, %rdi\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_right: \n"
 "	addq $1, %rdi\n"
 "	subq %rsi, %rdi\n"
 "	and $" XSTR((BF_JIT_MEM_SIZE-1)) ", %rdi\n"
 "	addq %rsi, %rdi\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_inc: \n"
 "	addb $1, (%rdi)\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_dec: \n"
 "	subb $1, (%rdi)\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_output: \n"
 "	push %rdi\n"
@@ -189,6 +194,7 @@ asm("\n"
 "	syscall\n"
 "	pop %rsi\n"
 "	pop %rdi\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_input: \n"
 "	push %rdi\n"
@@ -200,6 +206,7 @@ asm("\n"
 "	syscall\n"
 "	pop %rsi\n"
 "	pop %rdi\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_jump_if_zero: \n"
 "	cmpb $0, (%rdi)\n"
@@ -207,6 +214,7 @@ asm("\n"
 "	movq $0xDEADBEEFDEADBEEF, %rax\n"
 "	jmp *%rax\n"
 ".notzero:\n"
+"	mov %rdi, %rax\n"
 "	ret\n"
 "code_jump_if_not_zero: \n"
 "	cmpb $0, (%rdi)\n"
@@ -214,8 +222,10 @@ asm("\n"
 "	movq $0xDEADBEEFDEADBEEF, %rax\n"
 "	jmp *%rax\n"
 ".zero:\n"
-"code_exit: \n"
+"epiloge_begin: \n"
+"	mov %rdi, %rax\n"
 "	ret\n"
+"epiloge_end:\n"
 );
 
 
@@ -225,16 +235,17 @@ int main(int argc, const char *argv[]) {
 		exit(1);
 	}
 
+	size_t epiloge_size = (char*)epiloge_end - (char *)epiloge_begin;
 	OpCodes codes = {
-		{code_left, findLength(code_left), 0},
-		{code_right, findLength(code_right), 0},
-		{code_inc, findLength(code_inc), 0},
-		{code_dec, findLength(code_dec), 0},
-		{code_output, findLength(code_output), 0},
-		{code_input, findLength(code_input), 0},
-		{code_jump_if_zero, findLength(code_jump_if_zero), 0},
-		{code_jump_if_not_zero, findLength(code_jump_if_not_zero), 0},
-		{code_exit, 1, 0}, // Assumes `ret` is only a single byte.
+		{code_left, findLength(code_left, epiloge_begin, epiloge_size), 0},
+		{code_right, findLength(code_right, epiloge_begin, epiloge_size), 0},
+		{code_inc, findLength(code_inc, epiloge_begin, epiloge_size), 0},
+		{code_dec, findLength(code_dec, epiloge_begin, epiloge_size), 0},
+		{code_output, findLength(code_output, epiloge_begin, epiloge_size), 0},
+		{code_input, findLength(code_input, epiloge_begin, epiloge_size), 0},
+		{code_jump_if_zero, findLength(code_jump_if_zero, epiloge_begin, epiloge_size), 0},
+		{code_jump_if_not_zero, findLength(code_jump_if_not_zero, epiloge_begin, epiloge_size), 0},
+		{epiloge_begin, epiloge_size, 0},
 	};
 	codes.jump_if_zero.offset_to_address = findAddressOffset(code_jump_if_zero, codes.jump_if_zero.code_size);
 	codes.jump_if_not_zero.offset_to_address = findAddressOffset(code_jump_if_not_zero, codes.jump_if_not_zero.code_size);
