@@ -146,16 +146,16 @@ int findAddressOffset(void *start, size_t len) {
 	return 0;
 }
 
-extern void code_right();
-extern void code_left();
-extern void code_inc();
-extern void code_dec();
-extern void code_output();
-extern void code_input();
-extern void code_jump_if_zero();
-extern void code_jump_if_not_zero();
-extern void epiloge_begin();
-extern void epiloge_end();
+extern void *code_right(void *head, void *memory_begin);
+extern void *code_left(void *head, void *memory_begin);
+extern void *code_inc(void *head, void *memory_begin);
+extern void *code_dec(void *head, void *memory_begin);
+extern void *code_output(void *head, void *memory_begin);
+extern void *code_input(void *head, void *memory_begin);
+extern void *code_jump_if_zero(void *head, void *memory_begin);
+extern void *code_jump_if_not_zero(void *head, void *memory_begin);
+extern void *epiloge_begin(void *head, void *memory_begin);
+extern void *epiloge_end(void *head, void *memory_begin);
 
 /*
 rdi - head pointer
