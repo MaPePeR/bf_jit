@@ -98,7 +98,7 @@ void compile_ops(Code *code, FILE *file, OpCodes *codes, int end) {
 	}
 }
 
-typedef void *compiled_assembly(unsigned char *, unsigned char *);
+typedef void *compiled_assembly(unsigned char *);
 
 compiled_assembly *compile(const char *filename, OpCodes* codes) {
 	Code code = {0};
@@ -153,16 +153,16 @@ int findAddressOffset(void *start, size_t len) {
 
 extern void *prologe_begin();
 extern void *prologe_end();
-extern void *code_right(void *head, void *memory_begin);
-extern void *code_left(void *head, void *memory_begin);
-extern void *code_inc(void *head, void *memory_begin);
-extern void *code_dec(void *head, void *memory_begin);
-extern void *code_output(void *head, void *memory_begin);
-extern void *code_input(void *head, void *memory_begin);
-extern void *code_jump_if_zero(void *head, void *memory_begin);
-extern void *code_jump_if_not_zero(void *head, void *memory_begin);
-extern void *epiloge_begin(void *head, void *memory_begin);
-extern void *epiloge_end(void *head, void *memory_begin);
+extern void *code_right(void *memory_begin);
+extern void *code_left(void *memory_begin);
+extern void *code_inc(void *memory_begin);
+extern void *code_dec(void *memory_begin);
+extern void *code_output(void *memory_begin);
+extern void *code_input(void *memory_begin);
+extern void *code_jump_if_zero(void *memory_begin);
+extern void *code_jump_if_not_zero(void *memory_begin);
+extern void *epiloge_begin(void *memory_begin);
+extern void *epiloge_end(void *memory_begin);
 
 /*
 rax - head pointer
@@ -171,6 +171,7 @@ rsi - memory begin
 asm("\n"
 "prologe_begin:\n"
 "	mov %rdi, %rax\n"
+"	mov %rdi, %rsi\n"
 "prologe_end:\n"
 "code_left: \n"
 "	subq $1, %rax\n"
@@ -257,7 +258,7 @@ int main(int argc, const char *argv[]) {
 	const char * filename = argv[1];
 	compiled_assembly *compiled_code = compile(filename, &codes);
 	unsigned char *memory = calloc(BF_JIT_MEM_SIZE, 1);
-	compiled_code(memory, memory);
+	compiled_code(memory);
 	free(memory);
 	return 0;
 }
