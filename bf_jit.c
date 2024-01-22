@@ -3,6 +3,8 @@
 #include<sys/mman.h>
 #include<string.h>
 
+//#define BF_JIT_USE_ASM
+
 #ifndef BF_JIT_MEM_SIZE
 #define BF_JIT_MEM_SIZE (1<<15)
 #endif 
@@ -153,6 +155,8 @@ int findAddressOffset(void *start, size_t len) {
 
 extern void *prologe_begin();
 extern void *prologe_end();
+#ifdef BF_JIT_USE_ASM
+
 extern void *code_right(void *memory_begin);
 extern void *code_left(void *memory_begin);
 extern void *code_inc(void *memory_begin);
@@ -164,6 +168,36 @@ extern void *code_jump_if_not_zero(void *memory_begin);
 extern void *epiloge_begin(void *memory_begin);
 extern void *epiloge_end(void *memory_begin);
 
+#else
+#define HEAD_REGISTER(name) register void *(name) asm("rax")
+
+void *code_right(void *memory_begin) {
+	HEAD_REGISTER(head);
+	return memory_begin + ((head + 1 - memory_begin) & (BF_JIT_MEM_SIZE - 1));
+}
+void *code_left(void * head_, void *memory_begin) {
+	HEAD_REGISTER(head);
+	return memory_begin + ((head - 1 - memory_begin) & (BF_JIT_MEM_SIZE - 1));
+}
+void *code_inc(void *memory_begin) {
+	HEAD_REGISTER(head);
+	*((unsigned char *)head) += 1;
+	return head;
+}
+void *code_dec(void *memory_begin) {
+	HEAD_REGISTER(head);
+	*((unsigned char *)head) -= 1;
+	return head;
+}
+extern void *code_output(void *memory_begin);
+extern void *code_input(void *memory_begin);
+extern void *code_jump_if_zero(void *memory_begin);
+extern void *code_jump_if_not_zero(void *memory_begin);
+extern void *epiloge_begin(void *memory_begin);
+extern void *epiloge_end(void *memory_begin);
+#endif
+
+
 /*
 rax - head pointer
 rsi - memory begin
@@ -173,6 +207,7 @@ asm("\n"
 "	mov %rdi, %rax\n"
 "	mov %rdi, %rsi\n"
 "prologe_end:\n"
+#ifdef BF_JIT_USE_ASM
 "code_left: \n"
 "	subq $1, %rax\n"
 "	subq %rsi, %rax\n"
@@ -191,6 +226,7 @@ asm("\n"
 "code_dec: \n"
 "	subb $1, (%rax)\n"
 "	ret\n"
+#endif
 "code_output: \n"
 "	push %rax\n"
 "	push %rsi\n"
